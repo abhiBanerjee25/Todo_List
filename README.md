@@ -18,4 +18,4 @@ A simple Todo List web application built using HTML, CSS, and JavaScript.
 2. Open index.html in browser
 
 ## Author
-AB
+Abhi
