@@ -1,50 +1,40 @@
-const addTodoBtn = document.getElementById("addTodoBtn")
-const inputTag = document.getElementById("todoInput")
-const todoListUl = document.getElementById("todoList")
-const itemsLeft = document.getElementById("itemsLeft")
+const addTodoBtn = document.getElementById("addTodoBtn");
+const inputTag = document.getElementById("todoInput");
+const todoListUl = document.getElementById("todoList");
+const itemsLeft = document.getElementById("itemsLeft");
 let todoText;
 
-let todos = []
-let todosString = localStorage.getItem("todos")
+const API_URL = "http://localhost:3000/api/todos";
+let todos = [];
 
-// load from localStorage
-if (todosString) {
-    todos = JSON.parse(todosString)
-}
+const fetchTodos = async () => {
+    const response = await fetch(API_URL);
+    todos = await response.json();
+    populateTodos();
+    updateItemsLeft();
+};
 
 //items left function 
 const updateItemsLeft = () => {
-    const activeTodos = todos.filter(todo => !todo.isCompleted)
-    itemsLeft.textContent = `${activeTodos.length} items left`
-}
+    const activeTodos = todos.filter(todo => !todo.isCompleted);
+    itemsLeft.textContent = `${activeTodos.length} items left`;
+};
 
-let currentFilter = "all"
-
-//normalizing function
-const normalizeIds = () => {
-    todos = todos.map((todo, index) => {
-        return {
-            ...todo,
-            id: index + 1
-        }
-    })
-}
+let currentFilter = "all";
 
 const populateTodos = () => {
-    let string = ""
-
-    let filteredTodos = [...todos]
+    let string = "";
+    let filteredTodos = [...todos];
 
     if (currentFilter === "active") {
-        filteredTodos = filteredTodos.filter(todo => !todo.isCompleted)
-    }
-    else if (currentFilter === "completed") {
-        filteredTodos = filteredTodos.filter(todo => todo.isCompleted)
+        filteredTodos = filteredTodos.filter(todo => !todo.isCompleted);
+    } else if (currentFilter === "completed") {
+        filteredTodos = filteredTodos.filter(todo => todo.isCompleted);
     }
 
     const sortedTodos = filteredTodos.sort((a, b) => {
-        return a.title.localeCompare(b.title, undefined, { numeric: true })
-    })
+        return a.title.localeCompare(b.title, undefined, { numeric: true });
+    });
 
     for (const todo of sortedTodos) {
         string += `
@@ -52,128 +42,125 @@ const populateTodos = () => {
     <input type="checkbox" class="todo-checkbox" ${todo.isCompleted ? "checked" : ""}>
     <span class="todo-text">${todo.title}</span>
     <button class="delete-btn">x</button>
-</li>`
+</li>`;
     }
 
-    todoListUl.innerHTML = string
+    todoListUl.innerHTML = string;
+
+    // RE-ADDED: Missing selector for checkboxes
+    const todoCheckboxes = document.querySelectorAll(".todo-checkbox");
 
     // checkbox logic
-    const todoCheckboxes = document.querySelectorAll(".todo-checkbox")
-
     todoCheckboxes.forEach((element) => {
-        element.addEventListener("click", (e) => {
-            const parentId = element.parentNode.id
+        element.addEventListener("click", async (e) => {
+            const parentId = element.parentNode.id;
+            const todoId = Number(parentId.replace("todo-", ""));
+            const isChecked = e.target.checked;
 
-            if (e.target.checked) {
-                element.parentNode.classList.add("completed")
+            await fetch(`${API_URL}/${todoId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isCompleted: isChecked })
+            });
 
-                todos = todos.map(todo => {
-                    if ("todo-" + todo.id == parentId) {
-                        return { ...todo, isCompleted: true }
-                    }
-                    return todo
-                })
-            } else {
-                element.parentNode.classList.remove("completed")
+            todos = todos.map(todo => {
+                if (todo.id === todoId) {
+                    return { ...todo, isCompleted: isChecked };
+                }
+                return todo;
+            });
 
-                todos = todos.map(todo => {
-                    if ("todo-" + todo.id == parentId) {
-                        return { ...todo, isCompleted: false }
-                    }
-                    return todo
-                })
+            updateItemsLeft();
+            populateTodos();
+        });
+    });
+
+    // RE-ADDED: Missing selector for delete buttons
+    const deleteBtns = document.querySelectorAll(".delete-btn");
+
+    // FIXED TYPO: ldeleteBtns -> deleteBtns
+    deleteBtns.forEach((element) => {
+        element.addEventListener("click", async (e) => {
+            const todoId = Number(e.target.parentNode.id.replace("todo-", ""));
+            const todoToDelete = todos.find(todo => todo.id === todoId);
+
+            if (!todoToDelete.isCompleted) {
+                alert("Complete the task before deleting it.");
+                return;
+            }
+            if (!confirm("Delete this completed task?")) {
+                return;
             }
 
-            localStorage.setItem("todos", JSON.stringify(todos))
-            updateItemsLeft()
-        })
-    })
+            await fetch(`${API_URL}/${todoId}`, {
+                method: "DELETE"
+            });
 
-    // delete logic
-    let deleteBtns = document.querySelectorAll(".delete-btn")
+            todos = todos.filter(todo => todo.id !== todoId);
+            
+            updateItemsLeft();
+            populateTodos();
+        });
+    });
+};
 
-    deleteBtns.forEach((element) => {
-    element.addEventListener("click", (e) => {
-        const todoId = Number(e.target.parentNode.id.replace("todo-", ""))
-        const todoToDelete = todos.find(todo => todo.id === todoId)
+// add todo
+addTodoBtn.addEventListener("click", async () => {
+    todoText = inputTag.value.trim();
+    if (!todoText) return;
 
-        if (!todoToDelete.isCompleted) {
-            alert("Complete the task before deleting it.")
-            return
-        }
-        //comfirmation for deleting task
-        if (!confirm("Delete this completed task?")) {
-            return
-        }
+    inputTag.value = "";
 
-        todos = todos.filter(todo => todo.id !== todoId)
+    const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: todoText })
+    });
 
-        normalizeIds()
-
-        localStorage.setItem("todos", JSON.stringify(todos))
-        updateItemsLeft()
-        populateTodos()
-        })
-    })
-}
-
-// add todo (MOVED OUTSIDE to avoid duplicate listeners)
-addTodoBtn.addEventListener("click", () => {
-    todoText = inputTag.value.trim()
-    if (!todoText) return
-
-    inputTag.value = ""
-
-    let todo = {
-        id: todos.length + 1,
-        title: todoText,
-        isCompleted: false
-    }
-
-    todos.push(todo)
-    normalizeIds()
-    localStorage.setItem("todos", JSON.stringify(todos))
-    updateItemsLeft()
-    populateTodos()
-})
+    const newTodo = await response.json();
+    todos.push(newTodo);
+    
+    updateItemsLeft();
+    populateTodos();
+});
 
 //enter buttons
 inputTag.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-        addTodoBtn.click()
+        addTodoBtn.click();
     }
-})
+});
 
 //Active buttons
-const filterBtns = document.querySelectorAll(".filter-btn")
+const filterBtns = document.querySelectorAll(".filter-btn");
 
 filterBtns.forEach(btn => {
     btn.addEventListener("click", () => {
-
         filterBtns.forEach(button => {
-            button.classList.remove("active")
-        })
+            button.classList.remove("active");
+        });
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        populateTodos();
+    });
+});
 
-        btn.classList.add("active")
+// Completed Buttons (UPDATED TO USE API)
+const clearCompletedBtn = document.getElementById("clearCompletedBtn");
 
-        currentFilter = btn.dataset.filter
+clearCompletedBtn.addEventListener("click", async () => {
+    const completedTodos = todos.filter(todo => todo.isCompleted);
+    
+    // Send a delete request to the API for every completed task
+    for (const todo of completedTodos) {
+        await fetch(`${API_URL}/${todo.id}`, { method: "DELETE" });
+    }
 
-        populateTodos()
-    })
-})
+    // Update local state after successful server deletion
+    todos = todos.filter(todo => !todo.isCompleted);
+    updateItemsLeft();
+    populateTodos();
+});
 
-// Completed Buttons
-const clearCompletedBtn = document.getElementById("clearCompletedBtn")
-
-clearCompletedBtn.addEventListener("click", () => {
-    todos = todos.filter(todo => !todo.isCompleted)
-
-    localStorage.setItem("todos", JSON.stringify(todos))
-
-    updateItemsLeft()
-    populateTodos()
-})
-
-// initial render
-populateTodos()
-updateItemsLeft()
+// Initial API fetch (Removed redundant populate/update function calls)
+fetchTodos();
