@@ -4,7 +4,7 @@ const todoListUl = document.getElementById("todoList");
 const itemsLeft = document.getElementById("itemsLeft");
 let todoText;
 
-const API_URL = "http://localhost:3000/api/todos";
+const API_URL = "https://todo-list-qscp.onrender.com/api/todos";
 let todos = [];
 
 const fetchTodos = async () => {
